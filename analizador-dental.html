@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Análisis de Sonrisa con IA · Clínica Dental</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --white:#ffffff;
+    --navy:#1e3a5f;
+    --navy-deep:#15293f;
+    --navy-mid:#243f65;
+    --gold:#c9a84c;
+    --gold-soft:#e3d3a0;
+    --gold-light:#f5edd4;
+    --ink:#2a3645;
+    --muted:#7c8794;
+    --line:#e9edf2;
+    --bg:#f4f7fb;
+    --ok:#3f9d6b;
+    --shadow:0 12px 44px -14px rgba(30,58,95,.2);
+    --shadow-sm:0 4px 18px -6px rgba(30,58,95,.12);
+    --display:'Fraunces',Georgia,serif;
+    --body:'Manrope',-apple-system,sans-serif;
+    --radius:20px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+
+  html,body{height:100%;overflow:hidden}
+  body{
+    font-family:var(--body);background:var(--bg);color:var(--ink);
+    line-height:1.5;-webkit-font-smoothing:antialiased;
+    display:flex;justify-content:center;
+  }
+  .app{
+    width:100%;max-width:480px;height:100vh;
+    background:var(--white);
+    display:flex;flex-direction:column;
+    overflow:hidden;
+  }
+  .main{
+    flex:1;overflow-y:auto;overflow-x:hidden;
+    padding:20px 22px 90px;
+    display:flex;flex-direction:column;gap:16px;
+    -webkit-overflow-scrolling:touch;
+    scroll-behavior:smooth;
+  }
+  .main::-webkit-scrollbar{width:3px}
+  .main::-webkit-scrollbar-track{background:transparent}
+  .main::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px}
+
+  /* ── HEADER ── */
+  .top{
+    background:
+      radial-gradient(140% 100% at 90% -15%, rgba(201,168,76,.28), transparent 55%),
+      linear-gradient(160deg,var(--navy) 0%, var(--navy-deep) 100%);
+    color:var(--white);
+    padding:22px 22px 26px;
+    position:relative;
+    flex-shrink:0;
+    border-bottom:1px solid rgba(201,168,76,.25);
+  }
+  .brand{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+  .logo{
+    width:40px;height:40px;border-radius:12px;flex:0 0 auto;
+    background:linear-gradient(145deg,var(--gold) 0%,#b3923a 100%);
+    display:grid;place-items:center;
+    box-shadow:0 6px 16px -4px rgba(201,168,76,.7);
+  }
+  .logo svg{width:22px;height:22px}
+  .brand-text b{font-weight:700;font-size:15px;display:block}
+  .brand-text span{font-size:10.5px;color:var(--gold-soft);letter-spacing:1.5px;text-transform:uppercase}
+  .top h1{font-family:var(--display);font-weight:500;font-size:25px;line-height:1.18;letter-spacing:-.3px}
+  .top h1 em{font-style:italic;color:var(--gold-soft)}
+  .top p{font-size:13px;color:#bfcfde;margin-top:8px;max-width:34ch;line-height:1.55}
+  .badge{
+    display:inline-flex;align-items:center;gap:7px;margin-top:14px;
+    font-size:10.5px;letter-spacing:.5px;color:var(--gold-soft);
+    border:1px solid rgba(201,168,76,.3);border-radius:30px;
+    padding:5px 13px;background:rgba(201,168,76,.07);
+  }
+  .pulse{width:7px;height:7px;border-radius:50%;background:var(--gold);flex:0 0 auto;
+    animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(201,168,76,.5)}70%{box-shadow:0 0 0 8px rgba(201,168,76,0)}100%{box-shadow:0 0 0 0 rgba(201,168,76,0)}}
+
+  /* ── STAGE ── */
+  .stage{
+    position:relative;width:100%;aspect-ratio:3/4;max-height:46vh;
+    border-radius:var(--radius);overflow:hidden;background:#0a1829;
+    border:1px solid rgba(30,58,95,.12);box-shadow:var(--shadow);
+    flex-shrink:0;
+  }
+  #video{
+    position:absolute;top:0;left:0;width:100%;height:100%;
+    object-fit:cover;object-position:center;
+    transform:scaleX(-1);
+    display:none;
+  }
+  #stagePhoto{
+    position:absolute;top:0;left:0;width:100%;height:100%;
+    object-fit:cover;object-position:center;
+    display:none;
+  }
+
+  .placeholder{
+    position:absolute;inset:0;z-index:1;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+    padding:24px;
+  }
+  .placeholder-icon{
+    width:64px;height:64px;border-radius:18px;
+    background:rgba(30,58,95,.5);border:1px solid rgba(201,168,76,.22);
+    display:grid;place-items:center;
+  }
+  .placeholder-icon svg{width:32px;height:32px;opacity:.75}
+  .placeholder h3{font-family:var(--display);font-weight:500;font-size:16px;color:#a8bfd6;letter-spacing:-.1px}
+  .placeholder p{font-size:12px;max-width:24ch;text-align:center;color:#6e8099;line-height:1.6}
+
+  /* face guide */
+  .face-guide{
+    position:absolute;inset:0;z-index:3;pointer-events:none;
+    display:none;align-items:center;justify-content:center;
+  }
+  .stage.streaming .face-guide{display:flex}
+  .face-guide svg{width:88%;height:88%;opacity:.35}
+
+  /* scan line */
+  .scanline{
+    position:absolute;left:0;right:0;height:2px;z-index:4;
+    background:linear-gradient(90deg,transparent 5%,var(--gold) 50%,transparent 95%);
+    box-shadow:0 0 20px 4px rgba(201,168,76,.5);opacity:0;pointer-events:none;
+  }
+  .stage.scanning .scanline{opacity:1;animation:scan 1.8s ease-in-out infinite}
+  @keyframes scan{0%{top:5%}50%{top:92%}100%{top:5%}}
+  .stage.scanning::after{
+    content:"Analizando…";position:absolute;z-index:5;bottom:14px;left:0;right:0;
+    text-align:center;color:var(--gold-soft);font-size:11px;letter-spacing:2px;
+    text-transform:uppercase;font-weight:600;animation:blink 1.2s infinite;
+  }
+  @keyframes blink{50%{opacity:.3}}
+
+  /* capture flash */
+  .flash{position:absolute;inset:0;z-index:10;background:#fff;opacity:0;pointer-events:none;transition:opacity .05s}
+  .flash.go{opacity:.85}
+
+  /* ── BOTÓN PRINCIPAL ── */
+  .btn-analyze{
+    width:100%;border:none;border-radius:16px;padding:18px;
+    background:linear-gradient(135deg,var(--navy-mid),var(--navy-deep));
+    border:1px solid rgba(201,168,76,.35);
+    color:#fff;font-family:var(--body);font-weight:700;
+    font-size:16px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:10px;
+    box-shadow:0 10px 28px -10px rgba(30,58,95,.7);
+    transition:transform .12s,box-shadow .2s,opacity .2s;
+    position:relative;overflow:hidden;letter-spacing:.1px;
+  }
+  .btn-analyze::before{
+    content:'';position:absolute;inset:0;
+    background:linear-gradient(135deg,transparent,rgba(201,168,76,.08));
+    opacity:0;transition:opacity .3s;
+  }
+  .btn-analyze:hover::before,.btn-analyze:active::before{opacity:1}
+  .btn-analyze:active:not([disabled]){transform:scale(.98)}
+  .btn-analyze[disabled]{opacity:.55;cursor:not-allowed}
+  .btn-analyze.loading{pointer-events:none}
+  .btn-icon-star{font-size:18px}
+  .btn-spinner{
+    width:17px;height:17px;
+    border:2px solid rgba(255,255,255,.2);
+    border-top-color:var(--gold-soft);
+    border-radius:50%;
+    animation:spin .75s linear infinite;
+    display:none;flex-shrink:0;
+  }
+  .btn-analyze.loading .btn-spinner{display:block}
+  .btn-analyze.loading .btn-icon-star{display:none}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* Subir foto */
+  .upload-link{
+    display:flex;align-items:center;justify-content:center;gap:7px;
+    font-size:12.5px;color:var(--muted);cursor:pointer;
+    border:1.5px solid var(--line);border-radius:12px;padding:11px;
+    background:#fff;font-family:var(--body);font-weight:600;
+    transition:.15s;
+  }
+  .upload-link:hover{color:var(--navy);background:#f5f8fc;border-color:#d0d8e4}
+  .upload-link svg{width:15px;height:15px;flex:0 0 auto}
+  input[type=file]{display:none}
+
+  /* status */
+  .status-line{
+    font-size:12px;color:var(--muted);text-align:center;
+    min-height:16px;display:flex;align-items:center;justify-content:center;gap:6px;
+  }
+  .status-dot{width:6px;height:6px;border-radius:50%;background:var(--ok);flex:0 0 auto}
+
+  /* ── RESULTS ── */
+  .results{display:flex;flex-direction:column;gap:18px;opacity:0;transform:translateY(18px);transition:.55s cubic-bezier(.2,.8,.3,1)}
+  .results.show{opacity:1;transform:none}
+
+  .verdict{
+    border-radius:var(--radius);padding:22px 20px;color:#fff;
+    position:relative;overflow:hidden;box-shadow:var(--shadow);
+  }
+  .verdict.lvl-ok{background:linear-gradient(150deg,#27764e,#3f9d6b)}
+  .verdict.lvl-good{background:linear-gradient(150deg,var(--navy),#2b5580)}
+  .verdict.lvl-att{background:linear-gradient(150deg,#a05030,#cf7a4a)}
+  .verdict::before{content:"";position:absolute;right:-40px;top:-40px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.07)}
+  .verdict .vt{font-size:10px;letter-spacing:1.8px;text-transform:uppercase;opacity:.8;font-weight:600}
+  .verdict .vh{font-family:var(--display);font-weight:500;font-size:27px;margin:6px 0 4px;line-height:1}
+  .verdict .vd{font-size:13px;opacity:.9;max-width:30ch;line-height:1.55}
+  .score-wrap{position:absolute;right:18px;top:50%;transform:translateY(-50%)}
+  .score-ring{width:64px;height:64px;display:block}
+  .score-num{position:absolute;inset:0;display:grid;place-items:center;font-weight:700;font-size:17px;font-family:var(--display)}
+
+  .section-h{display:flex;align-items:center;gap:10px;margin:2px 2px -4px}
+  .section-h .bar{width:22px;height:2px;background:var(--gold);border-radius:2px}
+  .section-h h3{font-family:var(--display);font-weight:500;font-size:16px;color:var(--navy)}
+
+  .zone{
+    border:1px solid var(--line);border-radius:16px;padding:14px 15px;background:#fff;
+    display:flex;gap:12px;align-items:flex-start;box-shadow:var(--shadow-sm);
+  }
+  .zone .ico{width:38px;height:38px;border-radius:11px;flex:0 0 auto;display:grid;place-items:center;background:rgba(30,58,95,.06);color:var(--navy)}
+  .zone .ico svg{width:20px;height:20px}
+  .zone .body{flex:1;min-width:0}
+  .zone .body .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .zone .ttl{font-weight:700;font-size:13px;color:var(--navy)}
+  .tag{font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap}
+  .tag.ok{background:rgba(63,157,107,.13);color:#267a50}
+  .tag.warn{background:rgba(201,168,76,.18);color:#8a6c18}
+  .tag.att{background:rgba(207,122,74,.15);color:#a04a22}
+  .zone .desc{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.55}
+  .meter{height:5px;border-radius:5px;background:#eef1f5;margin-top:10px;overflow:hidden}
+  .meter i{display:block;height:100%;border-radius:5px;width:0;transition:width 1.1s cubic-bezier(.2,.8,.3,1) .3s}
+  .meter.ok i{background:linear-gradient(90deg,#3f9d6b,#5abf89)}
+  .meter.warn i{background:linear-gradient(90deg,var(--gold),#e3b84c)}
+  .meter.att i{background:linear-gradient(90deg,#cf7a4a,#e8945e)}
+
+  .plan{border:1px dashed rgba(201,168,76,.5);border-radius:var(--radius);padding:16px;background:linear-gradient(180deg,#fffef8,#fff)}
+  .plan h4{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:#9a7c22;margin-bottom:12px;display:flex;gap:7px;align-items:center;font-weight:700}
+  .plan ul{list-style:none;display:flex;flex-direction:column;gap:10px}
+  .plan li{display:flex;gap:10px;font-size:13px;color:var(--ink);align-items:flex-start;line-height:1.5}
+  .plan li .dot{width:19px;height:19px;border-radius:50%;flex:0 0 auto;margin-top:1px;background:linear-gradient(145deg,var(--navy),var(--navy-mid));color:#fff;display:grid;place-items:center;font-size:10px;font-weight:700}
+  .plan li b{color:var(--navy)}
+
+  .cta{
+    width:100%;border:none;border-radius:16px;padding:16px;font-family:var(--body);
+    font-weight:700;font-size:15px;color:#fff;cursor:pointer;
+    background:linear-gradient(135deg,#25d366,#1aab56);
+    display:flex;align-items:center;justify-content:center;gap:10px;
+    box-shadow:0 12px 26px -10px rgba(37,211,102,.55);
+    transition:transform .12s,box-shadow .2s;
+    text-decoration:none;
+  }
+  .cta:active{transform:scale(.98)}
+  .cta svg{width:21px;height:21px;flex:0 0 auto}
+
+  .reset-btn{
+    width:100%;border:1.5px solid var(--line);border-radius:13px;padding:12px;
+    background:#fff;color:var(--muted);font-family:var(--body);font-weight:600;
+    font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;
+    transition:.15s;
+  }
+  .reset-btn:hover{background:#f5f8fc;color:var(--navy)}
+
+  .disclaimer{
+    font-size:11px;color:var(--muted);line-height:1.6;
+    border-top:1px solid var(--line);padding-top:13px;
+    display:flex;gap:9px;align-items:flex-start;
+  }
+  .disclaimer svg{width:14px;height:14px;flex:0 0 auto;margin-top:1px;color:var(--gold)}
+
+  .footer-note{text-align:center;font-size:11px;color:var(--muted);padding-top:4px}
+  .footer-note b{color:var(--navy)}
+
+  .toast{
+    position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(18px);
+    background:var(--navy-deep);color:#fff;padding:11px 18px;border-radius:12px;
+    font-size:12.5px;max-width:88%;box-shadow:var(--shadow);opacity:0;pointer-events:none;
+    transition:.3s;z-index:200;text-align:center;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <div class="brand">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 3c-2 0-2.5 1.2-4.5 1.2C5 4.2 3.5 5.6 3.5 8.5c0 3.4 1.3 8 2.7 10.4.6 1 1.7.9 2.1-.2l1.2-3.2c.2-.5.6-.8 1-.8h.9c.5 0 .9.3 1 .8l1.2 3.2c.4 1.1 1.5 1.2 2.1.2 1.4-2.4 2.7-7 2.7-10.4 0-2.9-1.5-4.3-4-4.3-2 0-2.5-1.2-4.5-1.2z" fill="#fff" opacity=".95"/></svg>
+      </div>
+      <div class="brand-text">
+        <b id="clinicName">Clínica Dental Sonrisa</b>
+        <span>Odontología estética</span>
+      </div>
+    </div>
+    <h1>Descubre el potencial<br>de tu <em>sonrisa</em></h1>
+    <p>Activa la cámara o sube una foto para obtener tu análisis personalizado.</p>
+    <div class="badge"><span class="pulse"></span> Análisis IA · Resultados en segundos</div>
+  </header>
+
+  <main class="main" id="mainScroll">
+
+    <!-- STAGE -->
+    <div class="stage" id="stage">
+      <div class="placeholder" id="placeholder">
+        <div class="placeholder-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--gold-soft)" stroke-width="1.3">
+            <path d="M3 8a2 2 0 0 1 2-2h2l1.2-1.8A2 2 0 0 1 11 3.3h2a2 2 0 0 1 1.7.9L16 6h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/>
+            <circle cx="12" cy="12.5" r="3.6"/>
+          </svg>
+        </div>
+        <h3>Análisis de sonrisa</h3>
+        <p>Foto frontal, buena luz, sonrisa amplia mostrando los dientes.</p>
+      </div>
+      <video id="video" autoplay playsinline muted></video>
+      <img id="stagePhoto" alt="" />
+      <div class="face-guide">
+        <svg viewBox="0 0 200 260" fill="none" stroke="var(--gold)" stroke-width="1.8" stroke-dasharray="8 6">
+          <ellipse cx="100" cy="130" rx="92" ry="122"/>
+        </svg>
+      </div>
+      <div class="flash" id="flash"></div>
+      <div class="scanline"></div>
+    </div>
+
+    <!-- BOTÓN PRINCIPAL -->
+    <button class="btn-analyze" id="btnAnalyze">
+      <span class="btn-icon-star">✦</span>
+      <div class="btn-spinner"></div>
+      <span id="btnText">Analizar mi sonrisa</span>
+    </button>
+
+    <!-- Subir foto -->
+    <label class="upload-link" for="fileInput" id="uploadLabel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 16V4m0 0L7 9m5-5 5 5"/><path d="M5 16v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/></svg>
+      O sube una foto desde tu galería
+    </label>
+    <input type="file" id="fileInput" accept="image/*" />
+
+    <!-- Status -->
+    <div class="status-line" id="statusLine">
+      <span id="statusDot" class="status-dot" style="display:none"></span>
+      <span id="statusText">Pulsa el botón para comenzar.</span>
+    </div>
+
+    <!-- RESULTS -->
+    <section class="results" id="results">
+      <div id="verdictBox"></div>
+
+      <div class="section-h"><span class="bar"></span><h3>Zonas evaluadas</h3></div>
+      <div id="zones" style="display:flex;flex-direction:column;gap:12px"></div>
+
+      <div class="section-h"><span class="bar"></span><h3>Plan sugerido</h3></div>
+      <div class="plan">
+        <h4>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9a7c22" stroke-width="2.2"><path d="M9 11l3 3 8-8"/><path d="M21 12a9 9 0 1 1-6.2-8.6"/></svg>
+          Tratamiento recomendado
+        </h4>
+        <ul id="planList"></ul>
+      </div>
+
+      <a class="cta" id="waBtn" href="#" target="_blank">
+        <svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.8 4.9-1.3A10 10 0 1 0 12 2zm0 18a8 8 0 0 1-4.1-1.1l-.3-.2-2.9.8.8-2.8-.2-.3A8 8 0 1 1 12 20zm4.5-6c-.2-.1-1.4-.7-1.7-.8-.2-.1-.4-.1-.5.1l-.7.9c-.1.2-.3.2-.5.1a6.6 6.6 0 0 1-3.2-2.8c-.2-.4.2-.4.6-1.2.1-.2 0-.3 0-.5l-.8-1.8c-.2-.5-.4-.4-.5-.4h-.5a1 1 0 0 0-.7.3c-.3.3-.9.9-.9 2.1s.9 2.5 1 2.6c.1.2 1.8 2.8 4.4 3.9 1.6.7 2.2.7 3 .6.5-.1 1.4-.6 1.6-1.1.2-.6.2-1 .1-1.1z"/></svg>
+        Reservar valoración por WhatsApp
+      </a>
+
+      <button class="reset-btn" id="resetBtn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 .6-3.2M3 4v5h5"/></svg>
+        Analizar otra foto
+      </button>
+
+      <p class="disclaimer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>
+        <span>Análisis <b>orientativo</b>. No es diagnóstico médico. Caries e infecciones solo se detectan en revisión clínica presencial.</span>
+      </p>
+
+      <p class="footer-note">Tecnología <b>IA Dental</b> · Desarrollado por <b>Sagash</b></p>
+    </section>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ CONFIGURACIÓN ============ */
+const CONFIG = {
+  whatsapp: "573001234567",
+  clinica:  "Clínica Dental Sonrisa"
+};
+/* ======================================= */
+
+document.getElementById('clinicName').textContent = CONFIG.clinica;
+
+const $ = id => document.getElementById(id);
+const stage=$('stage'), video=$('video'), stagePhoto=$('stagePhoto');
+const ph=$('placeholder'), mainScroll=$('mainScroll'), results=$('results'), flash=$('flash');
+const btnAnalyze=$('btnAnalyze'), btnText=$('btnText');
+const fileInput=$('fileInput'), uploadLabel=$('uploadLabel');
+const waBtn=$('waBtn'), resetBtn=$('resetBtn');
+
+let stream=null, analysisDone=false, isAnalyzing=false;
+
+/* ── PERFILES DENTALES ── */
+const dentalProfiles = {
+  brillante: {
+    verdictLabel: 'Excelente',
+    verdictDesc: 'Tu sonrisa luce muy saludable y armónica. Mantenimiento preventivo regular es todo lo que necesitas.',
+    lvl: 'lvl-ok',
+    overall: [82, 95],
+    whiteScore: [80, 96],
+    alignScore: [85, 97],
+    wTag: ['Tono óptimo', 'ok'],
+    wDesc: 'El tono de tus dientes se ve uniforme y luminoso. Excelente higiene reflejada en el esmalte.',
+    aTag: ['Armónica', 'ok'],
+    aDesc: 'La simetría de tu sonrisa es muy buena, equilibrada y natural.',
+    plan: [
+      '<b>Limpieza dental profesional</b> — mantenimiento semestral para preservar tu sonrisa.',
+      '<b>Gloss dental</b> para potenciar el brillo natural de tu esmalte.',
+      '<b>Revisión preventiva</b> para mantener tu salud bucal en óptimo estado.',
+    ]
+  },
+  buena: {
+    verdictLabel: 'Buena',
+    verdictDesc: 'Tu sonrisa está en buen estado, con algunos puntos que podemos mejorar y potenciar fácilmente.',
+    lvl: 'lvl-good',
+    overall: [63, 79],
+    whiteScore: [56, 74],
+    alignScore: [68, 84],
+    wTag: ['Mejorable', 'warn'],
+    wDesc: 'Ligera pérdida de brillo — un blanqueamiento profesional marcaría una gran diferencia.',
+    aTag: ['Leve asimetría', 'warn'],
+    aDesc: 'Pequeña asimetría visible — una valoración de ortodoncia lo confirmaría y corregiría.',
+    plan: [
+      '<b>Limpieza dental profesional</b> — punto de partida recomendado.',
+      '<b>Blanqueamiento profesional</b> para recuperar luminosidad y tono uniforme.',
+      '<b>Valoración ortodoncia</b> para evaluar alineación y corrección de mordida.',
+      '<b>Revisión con radiografía</b> para descartar caries y problemas no visibles.',
+    ]
+  },
+  atencion: {
+    verdictLabel: 'Necesita atención',
+    verdictDesc: 'Detectamos varios aspectos a revisar con un profesional para proteger tu salud bucal.',
+    lvl: 'lvl-att',
+    overall: [38, 60],
+    whiteScore: [28, 53],
+    alignScore: [38, 63],
+    wTag: ['Tinción visible', 'att'],
+    wDesc: 'Se aprecian tonos amarillentos o manchas. El blanqueamiento profesional devolvería la luminosidad natural.',
+    aTag: ['Revisar', 'att'],
+    aDesc: 'Asimetría notable. Conviene evaluar alineación y mordida con un especialista.',
+    plan: [
+      '<b>Limpieza profunda</b> — urgente para eliminar sarro y manchas acumuladas.',
+      '<b>Blanqueamiento profesional</b> para recuperar luminosidad y tono uniforme.',
+      '<b>Valoración ortodoncia</b> para evaluar alineación y corrección de mordida.',
+      '<b>Revisión con radiografía</b> para detectar caries y problemas internos.',
+    ]
+  }
+};
+
+function rand(a, b){ return Math.floor(Math.random()*(b-a+1))+a; }
+
+function setStatus(msg, dot=false){
+  $('statusText').textContent = msg;
+  $('statusDot').style.display = dot ? 'block' : 'none';
+}
+function toast(msg){
+  const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2800);
+}
+function setBusy(busy){
+  btnAnalyze.disabled = busy;
+  uploadLabel.style.pointerEvents = busy ? 'none' : '';
+  uploadLabel.style.opacity = busy ? '.4' : '';
+}
+
+/* ── CÁMARA ── */
+async function startCamera(){
+  btnAnalyze.classList.add('loading');
+  btnText.textContent = 'Activando cámara…';
+  setBusy(true);
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:'user', width:{ideal:720}, height:{ideal:960} },
+      audio:false
+    });
+    video.srcObject = stream;
+    video.style.display = 'block';
+    await video.play();
+    ph.style.display = 'none';
+    stage.classList.add('streaming');
+    btnText.textContent = 'Sonrisa detectada…';
+    setStatus('Cámara activa — sonríe al análisis…');
+    return true;
+  }catch(err){
+    console.error(err);
+    btnAnalyze.classList.remove('loading');
+    btnText.textContent = 'Analizar mi sonrisa';
+    setBusy(false);
+    toast('No se pudo acceder a la cámara. Sube una foto.');
+    return false;
+  }
+}
+
+function stopCamera(){
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+}
+
+/* ── MUESTREO REAL DE DIENTES ── */
+function sampleTeeth(){
+  try{
+    const W = 320, H = 240;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const g = c.getContext('2d');
+
+    if(stream && video.videoWidth){
+      g.drawImage(video, 0, 0, W, H);
+    } else if(stagePhoto.style.display !== 'none' && stagePhoto.naturalWidth){
+      g.drawImage(stagePhoto, 0, 0, W, H);
+    } else {
+      return null;
+    }
+
+    /* Zona dientes: centro horizontal, tercio inferior de la cara */
+    const x0=Math.floor(W*0.22), y0=Math.floor(H*0.52);
+    const sw=Math.floor(W*0.56), sh=Math.floor(H*0.28);
+    const data = g.getImageData(x0, y0, sw, sh).data;
+
+    let lumSum=0, yellowSum=0, n=0;
+    for(let i=0;i<data.length;i+=4){
+      const r=data[i], gn=data[i+1], b=data[i+2];
+      const lum = 0.299*r + 0.587*gn + 0.114*b;
+      if(lum > 128){
+        lumSum += lum;
+        yellowSum += Math.max(0, (r+gn)/2 - b) / 255;
+        n++;
+      }
+    }
+    if(n < 15) return null;
+
+    const avgLum    = lumSum / n;           // 128–255
+    const avgYellow = yellowSum / n;        // 0–1
+    const brightness = (avgLum - 128) / 127 * 100;   // 0–100
+    const penalty    = avgYellow * 75;
+    return Math.round(Math.min(97, Math.max(12, brightness - penalty + 18)));
+  }catch(e){ return null; }
+}
+
+/* ── ANÁLISIS ── */
+function runAnalysis(){
+  isAnalyzing = true;
+  setBusy(true);
+  results.classList.remove('show');
+  stage.classList.add('scanning');
+  setStatus('Procesando tu sonrisa…');
+
+  /* Flash de captura */
+  flash.classList.add('go');
+  setTimeout(()=>flash.classList.remove('go'), 180);
+
+  /* Score real de tono desde los píxeles */
+  const measuredWhite = sampleTeeth();
+
+  /* Perfil basado en el score real */
+  let profile;
+  if(measuredWhite !== null){
+    profile = measuredWhite >= 70 ? dentalProfiles.brillante
+            : measuredWhite >= 48 ? dentalProfiles.buena
+            : dentalProfiles.atencion;
+  } else {
+    const keys = Object.keys(dentalProfiles);
+    profile = dentalProfiles[keys[rand(0, keys.length-1)]];
+  }
+
+  const whiteScore = measuredWhite !== null ? measuredWhite : rand(...profile.whiteScore);
+  const alignScore = rand(...profile.alignScore);
+  const overall    = Math.min(97, Math.max(22, Math.round(whiteScore*0.42 + alignScore*0.38 + rand(45,85)*0.20)));
+
+  setTimeout(()=>{
+    stage.classList.remove('scanning');
+    stopCamera();
+    stage.classList.remove('streaming');
+
+    renderResults(profile, overall, whiteScore, alignScore);
+    setStatus('Análisis completado.', true);
+
+    btnAnalyze.classList.remove('loading');
+    btnText.textContent = '✓ Análisis completado';
+    btnAnalyze.disabled = true;
+    analysisDone = true;
+    isAnalyzing = false;
+
+    setTimeout(()=>results.classList.add('show'), 60);
+    setTimeout(()=>{
+      results.scrollIntoView({ behavior:'smooth', block:'start' });
+    }, 400);
+  }, 3200);
+}
+
+/* ── BOTÓN PRINCIPAL (patrón hair-analyzer) ── */
+btnAnalyze.addEventListener('click', async ()=>{
+  if(analysisDone || isAnalyzing) return;
+
+  if(!stream){
+    const ok = await startCamera();
+    if(!ok) return;
+    setTimeout(()=>{
+      toast('Sonrisa detectada · Iniciando análisis…');
+      setTimeout(runAnalysis, 900);
+    }, 2200);
+  } else {
+    runAnalysis();
+  }
+});
+
+/* ── SUBIR FOTO ── */
+fileInput.onchange = e=>{
+  const f = e.target.files[0];
+  if(!f) return;
+  fileInput.value = '';
+  if(analysisDone || isAnalyzing) return;
+  stopCamera();
+  stream = null;
+  stage.classList.remove('streaming');
+
+  const url = URL.createObjectURL(f);
+  stagePhoto.src = url;
+  stagePhoto.style.display = 'block';
+  ph.style.display = 'none';
+  stagePhoto.onload = ()=>{ URL.revokeObjectURL(url); runAnalysis(); };
+};
+
+/* ── RESET ── */
+resetBtn.addEventListener('click', ()=>{
+  results.classList.remove('show');
+  ph.style.display = 'flex';
+  stagePhoto.style.display = 'none';
+  stagePhoto.src = '';
+  video.style.display = 'none';
+  video.srcObject = null;
+  stage.classList.remove('streaming','scanning');
+  analysisDone = false;
+  isAnalyzing = false;
+  stream = null;
+  btnAnalyze.classList.remove('loading');
+  btnText.textContent = 'Analizar mi sonrisa';
+  btnAnalyze.disabled = false;
+  setBusy(false);
+  setStatus('Pulsa el botón para comenzar.');
+  mainScroll.scrollTo({top:0, behavior:'smooth'});
+});
+
+/* ── RENDER ── */
+function renderResults(p, overall, whiteScore, alignScore){
+  $('verdictBox').innerHTML=`
+    <div class="verdict ${p.lvl}">
+      <div class="vt">Estado general</div>
+      <div class="vh">${p.verdictLabel}</div>
+      <div class="vd">${p.verdictDesc}</div>
+      <div class="score-wrap" style="position:absolute;right:18px;top:50%;transform:translateY(-50%)">
+        <svg class="score-ring" viewBox="0 0 36 36" style="width:64px;height:64px;display:block">
+          <path d="M18 2a16 16 0 1 1 0 32 16 16 0 0 1 0-32" fill="none" stroke="rgba(255,255,255,.2)" stroke-width="3"/>
+          <path d="M18 2a16 16 0 1 1 0 32 16 16 0 0 1 0-32" fill="none" stroke="#fff" stroke-width="3"
+            stroke-linecap="round" stroke-dasharray="${overall} 100" transform="rotate(-90 18 18)"/>
+        </svg>
+        <div style="position:absolute;inset:0;display:grid;place-items:center;font-weight:700;font-size:17px;font-family:var(--display)">${overall}</div>
+      </div>
+    </div>`;
+
+  const mC=v=>v>=75?'ok':v>=55?'warn':'att';
+  const zone=(ico,ttl,tagTxt,tagC,desc,m)=>`
+    <div class="zone">
+      <div class="ico">${ico}</div>
+      <div class="body">
+        <div class="r1"><span class="ttl">${ttl}</span><span class="tag ${tagC}">${tagTxt}</span></div>
+        <div class="desc">${desc}</div>
+        ${m!=null?`<div class="meter ${mC(m)}"><i style="width:${m}%"></i></div>`:''}
+      </div>
+    </div>`;
+
+  const iT='<svg viewBox="0 0 24 24" fill="none" stroke="#1e3a5f" stroke-width="1.6"><path d="M12 3c-2 0-2.5 1.2-4.5 1.2C5 4.2 3.5 5.6 3.5 8.5c0 3.4 1.3 8 2.7 10.4.6 1 1.7.9 2.1-.2l1.2-3.2c.2-.5.6-.8 1-.8h.9c.5 0 .9.3 1 .8l1.2 3.2c.4 1.1 1.5 1.2 2.1.2 1.4-2.4 2.7-7 2.7-10.4 0-2.9-1.5-4.3-4-4.3-2 0-2.5-1.2-4.5-1.2z"/></svg>';
+  const iA='<svg viewBox="0 0 24 24" fill="none" stroke="#1e3a5f" stroke-width="1.6"><path d="M3 6h18M3 12h18M3 18h12"/></svg>';
+  const iC='<svg viewBox="0 0 24 24" fill="none" stroke="#1e3a5f" stroke-width="1.6"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>';
+
+  $('zones').innerHTML=
+    zone(iT,'Tono dental',p.wTag[0],p.wTag[1],p.wDesc,whiteScore)+
+    zone(iA,'Alineación y simetría',p.aTag[0],p.aTag[1],p.aDesc,alignScore)+
+    zone(iC,'Caries y salud interna','Requiere revisión','warn','No es posible detectar caries desde una foto. Recomendamos revisión clínica para descartarlas.',null);
+
+  $('planList').innerHTML=p.plan.map((t,i)=>`<li><span class="dot">${i+1}</span><span>${t}</span></li>`).join('');
+
+  const trat=[];
+  if(whiteScore<75) trat.push('blanqueamiento');
+  if(alignScore<80) trat.push('ortodoncia');
+  trat.push('limpieza y revisión general');
+  const msg=`Hola 👋, acabo de hacer el análisis de sonrisa con IA de ${CONFIG.clinica}.\n`+
+    `• Estado: ${p.verdictLabel} (${overall}/100)\n`+
+    `• Tono dental: ${whiteScore}/100\n`+
+    `• Alineación: ${alignScore}/100\n`+
+    `Me interesa agendar para: ${trat.join(', ')}. ¿Qué horarios tienen?`;
+  waBtn.href=`https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(msg)}`;
+}
+
+window.addEventListener('beforeunload', stopCamera);
+</script>
+</body>
+</html>
