@@ -393,7 +393,7 @@
 <script>
 /* ============ CONFIGURACIÓN ============ */
 const CONFIG = {
-  whatsapp: "573001234567",
+  whatsapp: "573246101278",
   clinica:  "Clínica Dental Sonrisa"
 };
 /* ======================================= */
@@ -497,8 +497,8 @@ async function startCamera(){
     await video.play();
     ph.style.display = 'none';
     stage.classList.add('streaming');
-    btnText.textContent = 'Sonrisa detectada…';
-    setStatus('Cámara activa — sonríe al análisis…');
+    btnText.textContent = 'Cámara lista…';
+    setStatus('Cámara activa — colócate de frente y sonríe…');
     return true;
   }catch(err){
     console.error(err);
@@ -514,45 +514,125 @@ function stopCamera(){
   if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
 }
 
-/* ── MUESTREO REAL DE DIENTES ── */
-function sampleTeeth(){
+/* ── RNG DETERMINISTA (semilla sacada del propio píxel) ──
+   Sirve para que la MISMA foto dé SIEMPRE el mismo resultado. */
+function mulberry32(a){
+  return function(){
+    a|=0; a=a+0x6D2B79F5|0;
+    let t=Math.imul(a^a>>>15,1|a);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return ((t^t>>>14)>>>0)/4294967296;
+  };
+}
+function rseed(rng,a,b){ return Math.floor(rng()*(b-a+1))+a; }
+
+/* ── LECTURA REAL DE LA IMAGEN (un solo pase) ── */
+const FRAME_W=320, FRAME_H=240;
+function readFrame(){
   try{
-    const W = 320, H = 240;
-    const c = document.createElement('canvas');
-    c.width = W; c.height = H;
-    const g = c.getContext('2d');
+    const c=document.createElement('canvas'); c.width=FRAME_W; c.height=FRAME_H;
+    const g=c.getContext('2d');
+    if(stream && video.videoWidth){ g.drawImage(video,0,0,FRAME_W,FRAME_H); }
+    else if(stagePhoto.style.display!=='none' && stagePhoto.naturalWidth){ g.drawImage(stagePhoto,0,0,FRAME_W,FRAME_H); }
+    else { return null; }
+    return {g, W:FRAME_W, H:FRAME_H};
+  }catch(e){ return null; }
+}
 
-    if(stream && video.videoWidth){
-      g.drawImage(video, 0, 0, W, H);
-    } else if(stagePhoto.style.display !== 'none' && stagePhoto.naturalWidth){
-      g.drawImage(stagePhoto, 0, 0, W, H);
-    } else {
-      return null;
-    }
-
-    /* Zona dientes: centro horizontal, tercio inferior de la cara */
-    const x0=Math.floor(W*0.22), y0=Math.floor(H*0.52);
-    const sw=Math.floor(W*0.56), sh=Math.floor(H*0.28);
-    const data = g.getImageData(x0, y0, sw, sh).data;
-
-    let lumSum=0, yellowSum=0, n=0;
-    for(let i=0;i<data.length;i+=4){
-      const r=data[i], gn=data[i+1], b=data[i+2];
-      const lum = 0.299*r + 0.587*gn + 0.114*b;
-      if(lum > 128){
-        lumSum += lum;
-        yellowSum += Math.max(0, (r+gn)/2 - b) / 255;
-        n++;
+/* ── VALIDACIÓN REAL: ¿hay de verdad un rostro/sonrisa? ──
+   Si no, NO se inventa nada: se le pide al usuario repetir la foto. */
+function validateFace(g,W,H){
+  try{
+    const d=g.getImageData(0,0,W,H).data;
+    let lumSum=0, lumSqSum=0, count=0, skin=0, skinArea=0, skinC=0, skinCArea=0;
+    const isSkin=(r,gn,b)=> r>95 && gn>40 && b>20 &&
+        (Math.max(r,gn,b)-Math.min(r,gn,b))>15 &&
+        Math.abs(r-gn)>15 && r>gn && r>b;
+    for(let y=0;y<H;y++){
+      for(let x=0;x<W;x++){
+        const i=(y*W+x)*4;
+        const r=d[i], gn=d[i+1], b=d[i+2];
+        const lum=0.299*r+0.587*gn+0.114*b;
+        lumSum+=lum; lumSqSum+=lum*lum; count++;
+        const s = isSkin(r,gn,b);
+        /* zona central amplia (donde debería ir la cara) */
+        if(x>W*0.18 && x<W*0.82 && y>H*0.12 && y<H*0.9){ skinArea++; if(s) skin++; }
+        /* núcleo central: una cara real concentra mucha piel aquí; el ruido no */
+        if(x>W*0.34 && x<W*0.66 && y>H*0.22 && y<H*0.74){ skinCArea++; if(s) skinC++; }
       }
     }
-    if(n < 15) return null;
+    const avgLum=lumSum/count;
+    const stdDev=Math.sqrt(Math.max(0, lumSqSum/count - avgLum*avgLum));
+    const skinRatio=skin/skinArea;
+    const skinCenter=skinC/skinCArea;
 
-    const avgLum    = lumSum / n;           // 128–255
-    const avgYellow = yellowSum / n;        // 0–1
-    const brightness = (avgLum - 128) / 127 * 100;   // 0–100
-    const penalty    = avgYellow * 75;
-    return Math.round(Math.min(97, Math.max(12, brightness - penalty + 18)));
+    if(avgLum<35)        return {ok:false, reason:'Está muy oscuro. Busca buena luz e inténtalo de nuevo.'};
+    if(avgLum>248)       return {ok:false, reason:'La imagen está sobreexpuesta. Reduce la luz directa.'};
+    if(stdDev<14)        return {ok:false, reason:'No detectamos un rostro. Sal de frente y centra tu cara.'};
+    if(skinRatio<0.12 || skinCenter<0.25)
+                         return {ok:false, reason:'No detectamos un rostro claro. Acerca tu cara y mira de frente.'};
+    return {ok:true};
+  }catch(e){ return {ok:false, reason:'No se pudo leer la imagen. Inténtalo de nuevo.'}; }
+}
+
+/* ── MUESTREO DE DIENTES (zona boca) ── */
+function teethStats(g,W,H){
+  try{
+    const x0=Math.floor(W*0.22), y0=Math.floor(H*0.52);
+    const sw=Math.floor(W*0.56), sh=Math.floor(H*0.28);
+    const data=g.getImageData(x0,y0,sw,sh).data;
+    const half=Math.floor(sw/2);
+    let lumSum=0, yellowSum=0, n=0, lumL=0, nL=0, lumR=0, nR=0;
+    const lums=[];
+    for(let p=0;p<data.length;p+=4){
+      const px=(p/4)%sw;
+      const r=data[p], gn=data[p+1], b=data[p+2];
+      const lum=0.299*r+0.587*gn+0.114*b;
+      if(lum>128){
+        lumSum+=lum; yellowSum+=Math.max(0,(r+gn)/2-b)/255; lums.push(lum); n++;
+        if(px<half){ lumL+=lum; nL++; } else { lumR+=lum; nR++; }
+      }
+    }
+    return {n,lumSum,yellowSum,lums,lumL,nL,lumR,nR};
   }catch(e){ return null; }
+}
+
+/* ── MÉTRICAS DENTALES REALES (todas deterministas) ── */
+function dentalMetrics(s){
+  if(!s || s.n<15) return null;
+  const avgLum=s.lumSum/s.n;                          // 128–255
+  const avgYellow=s.yellowSum/s.n;                    // 0–1
+  const brightness=(avgLum-128)/127*100;
+  const whiteScore=Math.round(Math.min(97,Math.max(12, brightness - avgYellow*75 + 18)));
+
+  /* simetría real: brillo del lado izq. vs der. de la sonrisa */
+  let alignScore=72;
+  if(s.nL>4 && s.nR>4){
+    const lL=s.lumL/s.nL, lR=s.lumR/s.nR;
+    const asym=Math.abs(lL-lR)/((lL+lR)/2);           // 0 = simétrico
+    alignScore=Math.round(Math.min(97,Math.max(30, 100 - asym*260)));
+  }
+
+  /* uniformidad real: menor dispersión de brillo = sonrisa más pareja */
+  let varSum=0; for(const l of s.lums) varSum+=(l-avgLum)**2;
+  const stdDev=Math.sqrt(varSum/s.n);
+  const uniformity=Math.round(Math.min(97,Math.max(30, 100 - stdDev*0.9)));
+
+  const overall=Math.min(97,Math.max(22, Math.round(whiteScore*0.42 + alignScore*0.38 + uniformity*0.20)));
+  return {whiteScore,alignScore,uniformity,overall};
+}
+
+/* ── FALLO CONTROLADO: pide repetir, NO inventa resultados ── */
+function failAnalysis(reason){
+  stage.classList.remove('scanning');
+  isAnalyzing = false;
+  analysisDone = false;
+  btnAnalyze.classList.remove('loading');
+  btnAnalyze.disabled = false;
+  setBusy(false);
+  btnText.textContent = stream ? 'Reintentar análisis' : 'Analizar mi sonrisa';
+  setStatus(reason);
+  toast(reason);
 }
 
 /* ── ANÁLISIS ── */
@@ -567,23 +647,24 @@ function runAnalysis(){
   flash.classList.add('go');
   setTimeout(()=>flash.classList.remove('go'), 180);
 
-  /* Score real de tono desde los píxeles */
-  const measuredWhite = sampleTeeth();
+  /* 1) Capturar el cuadro actual */
+  const frame = readFrame();
+  if(!frame){ failAnalysis('Activa la cámara o sube una foto para analizar.'); return; }
 
-  /* Perfil basado en el score real */
-  let profile;
-  if(measuredWhite !== null){
-    profile = measuredWhite >= 70 ? dentalProfiles.brillante
-            : measuredWhite >= 48 ? dentalProfiles.buena
-            : dentalProfiles.atencion;
-  } else {
-    const keys = Object.keys(dentalProfiles);
-    profile = dentalProfiles[keys[rand(0, keys.length-1)]];
-  }
+  /* 2) ¿Hay un rostro real? Si no, se pide repetir (con un breve "pensando") */
+  const v = validateFace(frame.g, frame.W, frame.H);
+  if(!v.ok){ setTimeout(()=>failAnalysis(v.reason), 1100); return; }
 
-  const whiteScore = measuredWhite !== null ? measuredWhite : rand(...profile.whiteScore);
-  const alignScore = rand(...profile.alignScore);
-  const overall    = Math.min(97, Math.max(22, Math.round(whiteScore*0.42 + alignScore*0.38 + rand(45,85)*0.20)));
+  /* 3) ¿Se ven los dientes? */
+  const m = dentalMetrics(teethStats(frame.g, frame.W, frame.H));
+  if(!m){ setTimeout(()=>failAnalysis('No vemos bien tu sonrisa. Acércate y sonríe mostrando los dientes.'), 1100); return; }
+
+  const whiteScore = m.whiteScore, alignScore = m.alignScore, overall = m.overall;
+
+  /* El perfil (copy del veredicto) se elige por el puntaje global → siempre coincide */
+  const profile = overall>=78 ? dentalProfiles.brillante
+                : overall>=58 ? dentalProfiles.buena
+                :               dentalProfiles.atencion;
 
   setTimeout(()=>{
     stage.classList.remove('scanning');
@@ -614,7 +695,7 @@ btnAnalyze.addEventListener('click', async ()=>{
     const ok = await startCamera();
     if(!ok) return;
     setTimeout(()=>{
-      toast('Sonrisa detectada · Iniciando análisis…');
+      toast('Capturando tu sonrisa…');
       setTimeout(runAnalysis, 900);
     }, 2200);
   } else {
@@ -691,9 +772,18 @@ function renderResults(p, overall, whiteScore, alignScore){
   const iA='<svg viewBox="0 0 24 24" fill="none" stroke="#1e3a5f" stroke-width="1.6"><path d="M3 6h18M3 12h18M3 18h12"/></svg>';
   const iC='<svg viewBox="0 0 24 24" fill="none" stroke="#1e3a5f" stroke-width="1.6"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>';
 
+  /* Etiquetas y textos por zona, derivados del puntaje REAL medido */
+  const tierWhite = v => v>=75 ? ['Tono óptimo','ok','El tono de tus dientes se ve uniforme y luminoso. Buena higiene reflejada en el esmalte.']
+                       : v>=55 ? ['Mejorable','warn','Ligera pérdida de brillo — un blanqueamiento profesional marcaría una gran diferencia.']
+                       :         ['Tinción visible','att','Se aprecian tonos amarillentos o manchas. Un blanqueamiento devolvería la luminosidad natural.'];
+  const tierAlign = v => v>=80 ? ['Armónica','ok','La simetría de tu sonrisa es muy buena, equilibrada y natural.']
+                       : v>=60 ? ['Leve asimetría','warn','Pequeña asimetría visible — una valoración de ortodoncia lo confirmaría.']
+                       :         ['Revisar','att','Asimetría notable. Conviene evaluar alineación y mordida con un especialista.'];
+  const tw=tierWhite(whiteScore), ta=tierAlign(alignScore);
+
   $('zones').innerHTML=
-    zone(iT,'Tono dental',p.wTag[0],p.wTag[1],p.wDesc,whiteScore)+
-    zone(iA,'Alineación y simetría',p.aTag[0],p.aTag[1],p.aDesc,alignScore)+
+    zone(iT,'Tono dental',tw[0],tw[1],tw[2],whiteScore)+
+    zone(iA,'Alineación y simetría',ta[0],ta[1],ta[2],alignScore)+
     zone(iC,'Caries y salud interna','Requiere revisión','warn','No es posible detectar caries desde una foto. Recomendamos revisión clínica para descartarlas.',null);
 
   $('planList').innerHTML=p.plan.map((t,i)=>`<li><span class="dot">${i+1}</span><span>${t}</span></li>`).join('');
